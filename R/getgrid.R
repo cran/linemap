@@ -3,19 +3,22 @@
 #' @description Transform a polygon layer to a regular grid data.frame.
 #' @param x an sf polygon layer.
 #' @param cellsize size of the side of a grid cell.
-#' @param var name of the variable to transform to the grid. It can be a vector of names.
+#' @param var name of the variable to transform to the grid. It can be a vector
+#' of names.
 #' @return A data frame is returned.
 #' @export
 #' @examples
 #' library(linemap)
 #' library(sf)
-#' data("bretagne")
-#' data("france")
+#' Bretagne <- st_read(system.file("gpkg/geofla.gpkg", package = "linemap"),
+#'                     layer = "Bretagne")
+#' France <- st_read(system.file("gpkg/geofla.gpkg", package = "linemap"),
+#'                   layer = "France")
 #' # example on an extract of dataset
-#' cotedarmor <- bretagne[bretagne$CODE_DEPT == 22, ]
+#' cotedarmor <- Bretagne[Bretagne$CODE_DEPT == 22, ]
 #' cota <- getgrid(x = cotedarmor, cellsize = 1750, var = "POPULATION")
 #' opar <- par(mar = c(0,0,0,0))
-#' plot(st_geometry(france), col="lightblue3", border = NA, bg = "lightblue2",
+#' plot(st_geometry(France), col="lightblue3", border = NA, bg = "lightblue2",
 #'      xlim = c(min(cota$X), max(cota$X)), ylim= c(min(cota$Y), max(cota$Y)))
 #' linemap(x = cota, var = "POPULATION", k = 5, threshold = 1,
 #'         col = "lightblue3", border = "white", lwd = 0.8,
@@ -25,11 +28,11 @@
 #'
 #' \donttest{
 #' # example on the full dataset
-#' bret <- getgrid(x = bretagne, cellsize = 1750, var = "POPULATION")
+#' Bretagne_grid <- getgrid(x = Bretagne, cellsize = 1750, var = "POPULATION")
 #' opar <- par(mar = c(0,0,0,0))
-#' plot(st_geometry(france), col="lightblue3", border = NA, bg = "lightblue2",
-#'      xlim = c(min(bret$X), max(bret$X)), ylim= c(min(bret$Y), max(bret$Y)))
-#' linemap(x = bret, var = "POPULATION", k = 5, threshold = 1,
+#' plot(st_geometry(France), col="lightblue3", border = NA, bg = "lightblue2",
+#'      xlim = range(Bretagne_grid$X), ylim= range(Bretagne_grid$Y))
+#' linemap(x = Bretagne_grid, var = "POPULATION", k = 5, threshold = 1,
 #'         col = "lightblue3", border = "white", lwd = 0.8,
 #'         add = TRUE)
 #' par(opar)
@@ -53,20 +56,25 @@ getgrid <- function(x, cellsize, var){
 
   x$area <- sf::st_area(x)
   # predicted warning, we don't care...
-  options(warn = -1)
+  # options(warn = -1)
+  sf::st_agr(x) <- 'constant'
+  sf::st_agr(grid) <- 'constant'
+
   parts <- sf::st_intersection(x = grid[,"id_cell"], y = x)
-  options(warn = 0)
+  # options(warn = 0)
 
   parts$area_part <- sf::st_area(parts)
   lvar <- vector(mode = "list", length = length(var))
   names(lvar) <- var
   for (i in 1:length(lvar)){
-    lvar[[i]] <- as.vector(parts[[names(lvar)[i]]] * parts$area_part / parts$area)
+    lvar[[i]] <- as.vector(
+      parts[[names(lvar)[i]]] * parts$area_part / parts$area
+      )
   }
   v <- stats::aggregate(do.call(cbind,lvar), by = list(id = parts[['id_cell']]),
                  FUN = sum, na.rm=TRUE)
   grid <- merge(grid, v, by.x  = "id_cell", by.y = "id", all.x = T)
-  gr <- cbind(grid, sf::st_coordinates(sf::st_centroid(grid)))
+  gr <- cbind(grid, sf::st_coordinates(sf::st_centroid(sf::st_geometry(grid))))
   gr <- as.data.frame(gr[,c("X","Y",var), drop=TRUE])
   return(gr)
 }
